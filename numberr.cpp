@@ -224,17 +224,17 @@ numberr numberr::operator- (numberr x)
 
 numberr numberr::operator* (numberr x)
 {
-  return numberr(v * x.v, v * x.v*sqrt(e/v*e/v + x.e/x.v*x.e/x.v));
+  return numberr(v * x.v, abs(v * x.v*sqrt(e/v*e/v + x.e/x.v*x.e/x.v)));
 }
 
 numberr numberr::operator/ (numberr x)
 {
-  return numberr(v / x.v, v / x.v*sqrt(e/v*e/v + x.e/x.v*x.e/x.v));
+  return numberr(v / x.v, abs(v / x.v*sqrt(e/v*e/v + x.e/x.v*x.e/x.v)));
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
-//Funktionen für Mittelwerte und Potenzieren
+//Funktionen für Potenzieren
 //Für Numberrs
 numberr numberr::topow (numberr x)
 {
@@ -271,7 +271,7 @@ erray erray::operator* (numberr x)
   erray ergebnis(len);
   for (int iter = 0; iter < len; iter++) {
     ergebnis.v[iter] = v[iter] * x.v;
-    ergebnis.e[iter] = v[iter] * x.v*sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e/x.v*x.e/x.v);
+    ergebnis.e[iter] = abs(v[iter] * x.v*sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e/x.v*x.e/x.v));
   };
   return ergebnis;
 }
@@ -281,7 +281,7 @@ erray erray::operator/ (numberr x)
   erray ergebnis(len);
   for (int iter = 0; iter < len; iter++) {
     ergebnis.v[iter] = v[iter] / x.v;
-    ergebnis.e[iter] = v[iter] / x.v * sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e/x.v*x.e/x.v);
+    ergebnis.e[iter] = abs(v[iter] / x.v * sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e/x.v*x.e/x.v));
   };
   return ergebnis;
 }
@@ -323,7 +323,7 @@ erray erray::operator* (erray x)
   } else {
     for (int iter = 0; iter < len; iter++) {
       ergebnis.v[iter] = v[iter] * x.v[iter];
-      ergebnis.e[iter] = v[iter] * x.v[iter]*sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e[iter]/x.v[iter]*x.e[iter]/x.v[iter]);
+      ergebnis.e[iter] = abs(v[iter] * x.v[iter]*sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e[iter]/x.v[iter]*x.e[iter]/x.v[iter]));
     };
   }
   return ergebnis;
@@ -336,7 +336,7 @@ erray erray::operator/ (erray x)
   } else {
     for (int iter = 0; iter < len; iter++) {
       ergebnis.v[iter] = v[iter] / x.v[iter];
-      ergebnis.e[iter] = v[iter] / x.v[iter]*sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e[iter]/x.v[iter]*x.e[iter]/x.v[iter]);
+      ergebnis.e[iter] = abs(v[iter] / x.v[iter]*sqrt(e[iter]/v[iter]*e[iter]/v[iter] + x.e[iter]/x.v[iter]*x.e[iter]/x.v[iter]));
     };
   }
   return ergebnis;
@@ -424,16 +424,23 @@ erray erray2D::mean()
 //Print Funktionen zum bequemen darstellen
 //Zunächst Anpassung der Stellen:
 string konvert (double value, double error) {
+  //Da to_string nach der sechsten Nachkommastelle schneidet, wird ein Faktor eingefügt
+  int faktor = 0;
+  while ((error < 0.00001) && (error != 0)) {
+    error *= 10;
+    value *= 10;
+    faktor++;
+  }
   string err = to_string(error);
   string val = to_string(value);
-  string res;
+  string res; //Dieses Ergebnis wird am Ende zurück gegeben
   
-  int komma_v = 0;
-  int first_v = 999;
-  int komma_e = 0;
-  int sig_e = 0;
-    
-  int rund;
+  int komma_v = 0; //Position des Kommas im val string
+  int first_v = 999; //Position der ersten von 0 verschiedenen Stelle im val string
+  int komma_e = 0; //Position des Kommas im err string
+  int sig_e = err.length(); //Position der ersten von 0 verschiedenen Stelle im val string (falls dies eine 1 oder 2 ist wird um 1 erhöht, bzw 2 falls die erhöhte stelle ein Komma ist)
+
+  int rund;  //Die letzte (+1) Stelle des val string zur Entscheidung ob auf oder ab gerundet wird
   bool first = 1;
   bool longerr = 0;
   //Zuerst werden die Positionen der Kommas sowie der ersten von 0 verschiedenen Stellen im Wert und Fehler gesucht
@@ -459,15 +466,23 @@ string konvert (double value, double error) {
   if (val[sig_e + (komma_v - komma_e)] == '.') {sig_e++;};
   rund = (val[sig_e + 1 + (komma_v - komma_e)]) - '0';
   
-  //Jetzt wird der Ergebnis-String Stück für Stück aufgebaut
-  val.erase(sig_e + 1 + (komma_v - komma_e), val.length());
+  //Jetzt wird der Ergebnis-String Stück für Stück in NaWi Schreibweise aufgebaut
+  if (error != 0) {//if Schleife schließt Fehler aus, wenn Fehler 0 ist wird der Wert für sig_e zu hoch sonst.
+    val.erase(sig_e + 1 + (komma_v - komma_e), val.length());//Es werden alle nicht signifikanten Stellen gelöscht
+  } else {
+    val.erase(sig_e + (komma_v - komma_e), val.length());
+  };
+  //Zuerst wird die erste Ziffer und ein Komma kreiert
   res = val[first_v];
   res += '.';
+ 
+ //Nun werden entsprechend viele Stellen angehängt
   for (int i=first_v+1; i<=val.length()-2; i++) {//-1, wegen der 0-Terminierung, ohne die -1 wird die 0-Terminierung angehängt.
     if (val[i] != '.') {
       res += val[i];
-    }
+    } 
   };
+ 
   //Entsprechend der Rundung wird die letzte Stelle angehängt 
   if (rund < 5) {
     res += val[val.length()-1];
@@ -496,9 +511,9 @@ string konvert (double value, double error) {
   
   //Es wird noch die Zehnerpotenz ausgegeben
   if ((first_v < komma_v) && (komma_v != 1)) {
-    res = res + "e" + to_string(komma_v-1);
+    res = res + "e" + to_string(komma_v-1-faktor);
   } else if (first_v > komma_v) {
-    res = res + "e-" + to_string(first_v-1);
+    res = res + "e-" + to_string(first_v-1+faktor);
   };   
   
   return res;
@@ -517,7 +532,7 @@ void numberr::to_file (string name)
   ofstream data;
   data.open(name + ".csv", std::ios_base::app);
   //data.seekp(ios_base::end);
-  data << "\\SI{" << konvert(v,e) << "}" << endl;
+  data << "\\num{" << konvert(v,e) << "}" << endl;
   data.close();
 }
 
@@ -558,7 +573,9 @@ void erray::to_file (string name)
   data.open(name + ".csv", std::ios_base::app);
   //data.seekp(ios_base::end);
   for (int i=0; i<len; i++) {
-    data << "\\SI{" << konvert(v[i],e[i]) << "}" << endl;
+    //data << "\\num{" << konvert(v[i],e[i]) << "}" << endl;
+    data << v[i] << "\\pm" << e[i] << endl;
+    
   };
   data.close();
 } 
